@@ -1,6 +1,9 @@
-//
+/*
 // PUBLIC_INTERFACE
-export const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || "http://localhost:5000";
+Set the API base URL. Prefer environment variable; default to preview backend port 3001.
+Update this if your backend runs on a different host/port.
+*/
+export const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || "http://localhost:3001";
 
 /**
  * PUBLIC_INTERFACE
@@ -48,33 +51,30 @@ export async function apiRequest(path, options = {}) {
 // PUBLIC_INTERFACE
 export const Endpoints = {
   candidates: {
-    list: (q = "") => `/api/candidates${q ? `?${q}` : ""}`,
-    create: () => `/api/candidates`,
-    update: (id) => `/api/candidates/${id}`,
-    remove: (id) => `/api/candidates/${id}`,
+    list: (q = "") => `/candidates/${q ? `?${q}` : ""}`,
+    create: () => `/candidates/`,
+    update: (id) => `/candidates/${id}`,
+    remove: (id) => `/candidates/${id}`,
   },
   interviews: {
-    list: (q = "") => `/api/interviews${q ? `?${q}` : ""}`,
-    create: () => `/api/interviews`,
-    update: (id) => `/api/interviews/${id}`,
-    remove: (id) => `/api/interviews/${id}`,
+    list: (q = "") => `/interviews/${q ? `?${q}` : ""}`,
+    create: () => `/interviews/`,
+    update: (id) => `/interviews/${id}`,
+    remove: (id) => `/interviews/${id}`,
   },
   clients: {
-    list: (q = "") => `/api/clients${q ? `?${q}` : ""}`,
-    create: () => `/api/clients`,
-    update: (id) => `/api/clients/${id}`,
-    remove: (id) => `/api/clients/${id}`,
+    list: (q = "") => `/clients/${q ? `?${q}` : ""}`,
+    create: () => `/clients/`,
+    update: (id) => `/clients/${id}`,
+    remove: (id) => `/clients/${id}`,
+    // positions endpoints exist, but not wired here in this UI flow
   },
   metrics: {
-    kpis: (q = "") => `/api/metrics/kpis${q ? `?${q}` : ""}`,
-    charts: (q = "") => `/api/metrics/charts${q ? `?${q}` : ""}`,
-  },
-  notifications: {
-    list: () => `/api/notifications`,
-    markRead: (id) => `/api/notifications/${id}/read`,
+    summary: () => `/metrics/summary`,
+    notifications: () => `/metrics/notifications`,
   },
   files: {
-    uploadExcel: () => `/api/upload/excel`,
+    uploadExcel: () => `/uploads/excel`,
   }
 };
 

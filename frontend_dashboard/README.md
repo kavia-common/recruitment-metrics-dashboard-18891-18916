@@ -5,9 +5,9 @@ Modern React dashboard implementing the "Ocean Professional" theme. It connects 
 ## Quick start
 
 1. Configure backend API base URL
-   - Copy `.env.example` to `.env` and set:
+   - Copy `.env.example` to `.env` and set (preview default is 3001):
      ```
-     REACT_APP_API_BASE_URL=http://localhost:5000
+     REACT_APP_API_BASE_URL=http://localhost:3001
      ```
 2. Install and run
    ```

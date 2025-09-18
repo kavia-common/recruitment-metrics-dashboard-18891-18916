@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import "./App.css";
-import { API_BASE_URL, Endpoints, deleteJSON, getJSON, postJSON, putJSON, uploadFile } from "./api";
+import { API_BASE_URL, Endpoints, deleteJSON, getJSON, /* postJSON, */ putJSON, uploadFile } from "./api";
 
 // Lightweight icon set
 const Icons = {
@@ -196,17 +196,20 @@ function NotificationsPanel({ items = [], onMarkRead }) {
       </div>
       <div className="notifications">
         {items.length === 0 ? <div className="badge">No notifications</div> : null}
-        {items.map((n) => (
-          <div className="notice" key={n.id}>
-            <div>
-              <p>{n.message}</p>
-              <div className="meta">{n.type} • {new Date(n.created_at || n.createdAt || Date.now()).toLocaleString()}</div>
+        {items.map((n, idx) => {
+          const id = n.id ?? idx;
+          return (
+            <div className="notice" key={id}>
+              <div>
+                <p>{n.message}</p>
+                <div className="meta">{n.type}</div>
+              </div>
+              {!n.read && (
+                <button className="btn" onClick={() => onMarkRead(id)}>Mark read</button>
+              )}
             </div>
-            {!n.read && (
-              <button className="btn" onClick={() => onMarkRead(n.id)}>Mark read</button>
-            )}
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
@@ -261,7 +264,7 @@ function CandidatesPanel({ filters }) {
   const [loading, setLoading] = useState(false);
 
   const columns = useMemo(() => ([
-    { key: "name", title: "Name" },
+    { key: "full_name", title: "Name" },
     { key: "email", title: "Email" },
     { key: "status", title: "Status" },
     { key: "source", title: "Source" },
@@ -298,7 +301,7 @@ function CandidatesPanel({ filters }) {
   }
 
   async function onDelete(rec) {
-    if (!window.confirm(`Delete ${rec.name}?`)) return;
+    if (!window.confirm(`Delete ${rec.full_name}?`)) return;
     try {
       await deleteJSON(Endpoints.candidates.remove(rec.id));
       load();
@@ -322,10 +325,10 @@ function InterviewsPanel({ filters }) {
   const [loading, setLoading] = useState(false);
 
   const columns = useMemo(() => ([
-    { key: "candidate_name", title: "Candidate" },
-    { key: "client_name", title: "Client" },
+    { key: "candidate_id", title: "Candidate ID" },
     { key: "stage", title: "Stage" },
-    { key: "date", title: "Date", render: (v) => v ? new Date(v).toLocaleDateString() : "" },
+    { key: "scheduled_at", title: "Scheduled At", render: (v) => v ? new Date(v).toLocaleString() : "" },
+    { key: "result", title: "Result" },
   ]), []);
 
   async function load() {
@@ -357,7 +360,7 @@ function InterviewsPanel({ filters }) {
   }
 
   async function onDelete(rec) {
-    if (!window.confirm(`Delete interview with ${rec.candidate_name}?`)) return;
+    if (!window.confirm(`Delete interview for candidate #${rec.candidate_id}?`)) return;
     try {
       await deleteJSON(Endpoints.interviews.remove(rec.id));
       load();
@@ -382,8 +385,8 @@ function ClientsPanel({ filters }) {
 
   const columns = useMemo(() => ([
     { key: "name", title: "Client" },
-    { key: "open_roles", title: "Open Roles" },
-    { key: "sla_days", title: "SLA (days)" },
+    { key: "industry", title: "Industry" },
+    { key: "status", title: "Status" },
   ]), []);
 
   async function load() {
@@ -404,10 +407,10 @@ function ClientsPanel({ filters }) {
   useEffect(() => { load(); /* eslint-disable-next-line */ }, []);
 
   async function onEdit(rec) {
-    const openRoles = window.prompt("Update open roles", rec.open_roles ?? 0);
-    if (openRoles == null) return;
+    const industry = window.prompt("Update industry", rec.industry || "");
+    if (industry == null) return;
     try {
-      await putJSON(Endpoints.clients.update(rec.id), { ...rec, open_roles: Number(openRoles) });
+      await putJSON(Endpoints.clients.update(rec.id), { industry });
       load();
     } catch (e) {
       alert(e.message || "Update failed");
@@ -446,32 +449,23 @@ function Dashboard() {
 
   async function loadKpisAndCharts() {
     try {
-      const params = new URLSearchParams();
-      if (filters.range) params.set("range", filters.range);
-      const res = await getJSON(Endpoints.metrics.kpis(params.toString()));
+      const res = await getJSON(Endpoints.metrics.summary());
       setKpis({
-        candidates: res?.candidates ?? 0,
-        interviews: res?.interviews ?? 0,
-        clients: res?.clients ?? 0,
-        rate: res?.conversion_rate ?? "0%",
+        candidates: res?.total_candidates ?? 0,
+        interviews: res?.upcoming_interviews ?? 0,
+        clients: (res?.open_positions ?? 0) + (res?.closed_positions ?? 0),
+        rate: `${res?.hired_candidates ?? 0}/${res?.total_candidates ?? 0}`,
       });
+      setChartData(null); // no charts endpoint in backend, keep placeholder
     } catch (e) {
-      setError(e.message || "Failed to load KPIs");
-    }
-    try {
-      const params = new URLSearchParams();
-      if (filters.range) params.set("range", filters.range);
-      const res = await getJSON(Endpoints.metrics.charts(params.toString()));
-      setChartData(res || {});
-    } catch (e) {
-      // non-fatal
+      setError(e.message || "Failed to load metrics");
     }
   }
 
   async function loadNotifications() {
     try {
-      const res = await getJSON(Endpoints.notifications.list());
-      setNotifs(Array.isArray(res?.items) ? res.items : Array.isArray(res) ? res : []);
+      const res = await getJSON(Endpoints.metrics.notifications());
+      setNotifs(Array.isArray(res) ? res : []);
     } catch (e) {
       // non-fatal
     }
@@ -492,12 +486,10 @@ function Dashboard() {
   }
 
   async function markRead(id) {
-    try {
-      await postJSON(Endpoints.notifications.markRead(id), {});
-      setNotifs((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
-    } catch (e) {
-      // ignore
-    }
+    setNotifs((prev) => prev.map((n, idx) => {
+      const nId = n.id ?? idx; // notifications don’t have IDs from backend; fallback to index
+      return (nId === id) ? { ...n, read: true } : n;
+    }));
   }
 
   return (
