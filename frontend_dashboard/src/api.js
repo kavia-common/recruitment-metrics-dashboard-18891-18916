@@ -3,7 +3,21 @@
 Set the API base URL. Prefer environment variable; default to preview backend port 3001.
 Update this if your backend runs on a different host/port.
 */
-export const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || "http://localhost:3001";
+export const API_BASE_URL =
+  process.env.REACT_APP_API_BASE_URL ||
+  (() => {
+    // Derive backend URL from current location, swapping to port 3001 and preserving protocol/host.
+    // Works for preview hosts like https://host:3000 -> https://host:3001
+    if (typeof window !== "undefined" && window.location) {
+      try {
+        const { protocol, hostname } = window.location;
+        return `${protocol}//${hostname}:3001`;
+      } catch {
+        // Fallback if window parsing fails
+      }
+    }
+    return "http://localhost:3001";
+  })();
 
 /**
  * PUBLIC_INTERFACE
@@ -39,6 +53,15 @@ export async function apiRequest(path, options = {}) {
       const error = new Error(message);
       error.status = res.status;
       error.payload = payload;
+      if (process.env.NODE_ENV !== "production") {
+        // eslint-disable-next-line no-console
+        console.error("API request failed", {
+          url: `${API_BASE_URL}${path}`,
+          status: res.status,
+          message,
+          payload
+        });
+      }
       throw error;
     }
 
