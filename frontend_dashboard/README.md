@@ -27,6 +27,17 @@ Launches the test runner in interactive watch mode.
 Builds the app for production to the `build` folder.\
 It correctly bundles React in production mode and optimizes the build for the best performance.
 
+## API Integration
+
+The frontend communicates with a backend API using a reusable Axios client.
+
+1. Copy `.env.example` to `.env` and set:
+   - `REACT_APP_API_BASE_URL` (e.g., `http://localhost:8000`)
+2. Start the backend with CORS enabled to allow the frontend origin (http://localhost:3000).
+3. Components can import functions from `src/services/apiClient.js` (e.g., `getHealth`, `getCandidates`).
+
+See `API_USAGE.md` for details on adding new endpoints and error handling.
+
 ## Customization
 
 ### Colors
