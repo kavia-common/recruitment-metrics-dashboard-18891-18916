@@ -4,8 +4,20 @@ Set the API base URL. Prefer environment variable; default to preview backend po
 Update this if your backend runs on a different host/port.
 */
 export const API_BASE_URL =
-  process.env.REACT_APP_API_BASE_URL ||
   (() => {
+    // Ensure we produce a normalized base URL with no trailing slash
+    const env = (process.env.REACT_APP_API_BASE_URL || "").trim();
+    const fromEnv = env ? env : null;
+
+    if (fromEnv) {
+      try {
+        const u = new URL(fromEnv);
+        return `${u.protocol}//${u.host}`; // strip paths if any
+      } catch {
+        // If invalid URL in env, fall back to window-derived
+      }
+    }
+
     // Derive backend URL from current location, swapping to port 3001 and preserving protocol/host.
     // Works for preview hosts like https://host:3000 -> https://host:3001
     if (typeof window !== "undefined" && window.location) {
@@ -31,17 +43,20 @@ export async function apiRequest(path, options = {}) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 30000); // 30s timeout
 
+  const fullUrl = `${API_BASE_URL}${path.startsWith("/") ? "" : "/"}${path}`;
   const headers = {
-    "Accept": "application/json",
+    Accept: "application/json",
     ...(options.body instanceof FormData ? {} : { "Content-Type": "application/json" }),
-    ...(options.headers || {})
+    ...(options.headers || {}),
   };
 
   try {
-    const res = await fetch(`${API_BASE_URL}${path}`, {
+    const res = await fetch(fullUrl, {
       ...options,
       headers,
-      signal: controller.signal
+      signal: controller.signal,
+      // credentials can be toggled if backend uses cookies; default omit to avoid CORS complications.
+      credentials: options.credentials || "omit",
     });
 
     const contentType = res.headers.get("content-type") || "";
@@ -53,19 +68,36 @@ export async function apiRequest(path, options = {}) {
       const error = new Error(message);
       error.status = res.status;
       error.payload = payload;
+      error.url = fullUrl;
       if (process.env.NODE_ENV !== "production") {
         // eslint-disable-next-line no-console
         console.error("API request failed", {
-          url: `${API_BASE_URL}${path}`,
+          url: fullUrl,
           status: res.status,
           message,
-          payload
+          payload,
         });
       }
       throw error;
     }
 
     return payload;
+  } catch (err) {
+    // Network errors (CORS, DNS, connection refused, timeout abort)
+    if (err?.name === "AbortError") {
+      const e = new Error(`Request timed out after 30s: ${fullUrl}`);
+      e.cause = err;
+      throw e;
+    }
+    if (err instanceof TypeError && /fetch/i.test(err.message)) {
+      const hint =
+        "Network error during fetch. Check that the backend is running, the REACT_APP_API_BASE_URL is correct, and CORS is enabled on the backend for this origin.";
+      const e = new Error(`Failed to fetch ${fullUrl}. ${hint}`);
+      e.cause = err;
+      throw e;
+    }
+    // rethrow other errors
+    throw err;
   } finally {
     clearTimeout(timeout);
   }
